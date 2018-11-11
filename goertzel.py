@@ -1,6 +1,6 @@
 import math
 
-def goertzel(samples, sample_rate, *freqs):
+def goertzel(samples):
     """
     Implementation of the Goertzel algorithm, useful for calculating individual
     terms of a discrete Fourier transform.
@@ -15,8 +15,14 @@ def goertzel(samples, sample_rate, *freqs):
         
         freqs, results = goertzel(some_samples, 44100, (400, 500), (1000, 1100))
     """
+    # We will only be processing audio, so 48kHz is the sample rate we will use.
+    # Likewise, since we will only be doing DTMF decoding, we can hard code the
+    # frequencies we look for. We take both of these out of the argument list for
+    # the algorithm. -Maudrie
+    SAMPLE_RATE=48000
+    freqs=((697, 770, 852, 941), (1209, 1336, 1477))
     window_size = len(samples)
-    f_step = sample_rate / float(window_size)
+    f_step = SAMPLE_RATE / float(window_size)
     f_step_normalized = 1.0 / window_size
 
     # Calculate all the DFT bins we have to compute to include frequencies
