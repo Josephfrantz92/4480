@@ -63,14 +63,9 @@ def goertzel(samples):
         # Storing results `(real part, imag part, power)`
         #We don't need real part or imag part, we only need power
         #-Maudrie
-        results.append(
-            d2**2 + d1**2 - w_real * d1 * d2
-        )
+        results.append(d2**2 + d1**2 - w_real * d1 * d2)
         freqs.append(f * sample_rate)
     return freqs, results
-
-
-
 
 if __name__ == '__main__':
 
@@ -86,9 +81,9 @@ if __name__ == '__main__':
         chunk_no=ceil(duration/.04)
 
     outputstring=""
-
-    for x in range chunk_no:
-
+    
+    for x in range (chunk_no):
+        
         t1=x*.4
         t2=t1+.4
         if (t2>duration):
