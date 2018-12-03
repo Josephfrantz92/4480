@@ -52,7 +52,6 @@ def goertzel(samples):
         # Bin frequency and coefficients for the computation
         f = k * f_step_normalized
         w_real = 2.0 * math.cos(2.0 * math.pi * f)
-        w_imag = math.sin(2.0 * math.pi * f)
 
         # Doing the calculation on the whole sample
         d1, d2 = 0.0, 0.0
@@ -64,21 +63,19 @@ def goertzel(samples):
         #We don't need real part or imag part, we only need power
         #-Maudrie
         results.append(d2**2 + d1**2 - w_real * d1 * d2)
-        freqs.append(f * sample_rate)
+        freqs.append(f * SAMPLE_RATE)
     return freqs, results
 
 if __name__ == '__main__':
 
     if (len(sys.argv)>=2):
-        inputaudio=sys.argv[2]
+        input_audio=sys.argv[2]
     else :
         print("Specify file path as command line arg")
 
-    with contextlib.closing(wave.open(inputaudio,'r')) as f:
-        frames = f.getnframes()
-        rate = f.getframerate()
-        duration = frames / float(rate)
-        chunk_no=ceil(duration/.04)
+    whole_file=pydub.AudioSegment.from_wav(input_audio)
+    duration=len(whole_file)
+    chunk_no=duration/.04
 
     outputstring=""
     
@@ -86,25 +83,15 @@ if __name__ == '__main__':
         
         t1=x*.4
         t2=t1+.4
-        if (t2>duration):
-            t2=duration
+        if (t2>duration):t2=duration
 
-        chunk=AudioSegment.from_wav(inputaudio)
+        chunk=pydub.AudioSegment.from_wav(input_audio)
         chunk=chunk[t1:t2]
         chunk.export('chunk.wav', format="wav")
-        meas_freqs, result= goertzel(chunk)
+        meas_freqs, result= goertzel('chunk.wav')
 
-        highest, second=0, 0
-        highest_index, second_index=-1,-1
-        for y in range len(result):
-            if result[y]>second:
-                if result[y]>highest:
-                    highest=result[y]
-                else:
-                    second=result[y]
+        meas_freq1, meas_freq2=find_two_most_present(meas_freqs, result)
         
-        meas_freq1, meas_freq2= meas_freqs[highest_index], meas_freqs[second_index]            
-
         actual_freq1=find_most_similar(meas_freq1)
         actual_freq2=find_most_similar(meas_freq2)
 
@@ -113,9 +100,25 @@ if __name__ == '__main__':
 
         outputstring=outputstring+dtmf_to_digit(actual_freq1, actual_freq2)
 
-        os.remove("chunk.wav")
+        os.remove('chunk.wav')
 
     print(outputstring)
+
+def find_two_most_present(meas_freqs, result):
+
+    highest=0
+    second=0
+    highest_index=-1
+    second_index=-1
+     
+    for y in len(result):
+        if result[y]>second:
+            if result[y]>highest:
+                second, highest=highest, result[y]
+            else:
+                second=result[y]
+
+    return meas_freqs[highest_index], meas_freqs[second_index]
 
 def dtmf_to_digit(x,y):
     if x==697:
@@ -149,13 +152,13 @@ def dtmf_to_digit(x,y):
 
 def find_most_similar(meas_freq):
 
-    dmtf_freqs=[697, 770, 852, 941, 1209, 1336, 1477]
+    dtmf_freqs=[697, 770, 852, 941, 1209, 1336, 1477]
 
     error=10000
     most_similar_index=-1
-    for x in len(dtmf_freqs):
+    for x in range(len(dtmf_freqs)):
         new_error=abs((dtmf_freqs[x]-meas_freq)/meas_freq)
-        if new_error<error:
-            error=new_error
-            most_similar_index=x
+        if (new_error<error):
+            error, most_similar_index=new_error,x
+            
     return dtmf_freqs[most_similar_index]
