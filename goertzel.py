@@ -54,9 +54,9 @@ def goertzel(samples):
             d2, d1 = d1, y
 
         # Storing results `(real part, imag part, power)`
-        results.append((
-            0.5 * w_real * d1 - d2, w_imag * d1,
-            d2**2 + d1**2 - w_real * d1 * d2)
+        #We don't need real part or imag part, we only need power
+        results.append(
+            d2**2 + d1**2 - w_real * d1 * d2
         )
         freqs.append(f * sample_rate)
     return freqs, results
