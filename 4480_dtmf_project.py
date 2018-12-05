@@ -3,8 +3,8 @@ import pydub
 import pylab
 import os
 import math
-import wave
-import struct
+from scipy.io import wavfile
+import numpy as np
 
 def goertzel(samples):
     """
@@ -27,7 +27,7 @@ def goertzel(samples):
     # the algorithm.
     # -Maudrie
     SAMPLE_RATE=48000
-    freqs=((697, 770, 852, 941, 1209, 1336, 1477))
+    FREQS=((697, 770, 852, 941, 1209, 1336, 1477))
     window_size = len(samples)
     f_step = SAMPLE_RATE / float(window_size)
     f_step_normalized = 1.0 / window_size
@@ -35,8 +35,8 @@ def goertzel(samples):
     # Calculate all the DFT bins we have to compute to include frequencies
     # in `freqs`.
     bins = set()
-    for f_range in freqs:
-        f_start, f_end = f_range
+    for f_range in FREQS:
+        f_start, f_end = f_range, f_range
         k_start = int(math.floor(f_start / f_step))
         k_end = int(math.ceil(f_end / f_step))
 
@@ -66,59 +66,35 @@ def goertzel(samples):
         freqs.append(f * SAMPLE_RATE)
     return freqs, results
 
-if __name__ == '__main__':
-
-    if (len(sys.argv)>=2):
-        input_audio=sys.argv[2]
-    else :
-        print("Specify file path as command line arg")
-
-    whole_file=pydub.AudioSegment.from_wav(input_audio)
-    duration=len(whole_file)
-    chunk_no=duration/.04
-
-    outputstring=""
-    
-    for x in range (chunk_no):
-        
-        t1=x*.4
-        t2=t1+.4
-        if (t2>duration):t2=duration
-
-        chunk=pydub.AudioSegment.from_wav(input_audio)
-        chunk=chunk[t1:t2]
-        chunk.export('chunk.wav', format="wav")
-        meas_freqs, result= goertzel('chunk.wav')
-
-        meas_freq1, meas_freq2=find_two_most_present(meas_freqs, result)
-        
-        actual_freq1=find_most_similar(meas_freq1)
-        actual_freq2=find_most_similar(meas_freq2)
-
-        if actual_freq1>actual_freq2:
-            actual_freq1, actual_freq2= actual_freq2, actual_freq1
-
-        outputstring=outputstring+dtmf_to_digit(actual_freq1, actual_freq2)
-
-        os.remove('chunk.wav')
-
-    print(outputstring)
-
-def find_two_most_present(meas_freqs, result):
-
+def extract_highest(meas_freqs, result):
     highest=0
     second=0
     highest_index=-1
     second_index=-1
-     
-    for y in len(result):
+    
+    for y in range(len(result)):
         if result[y]>second:
             if result[y]>highest:
                 second, highest=highest, result[y]
+                second_index, highest_index=highest_index, y
             else:
                 second=result[y]
-
+                second_index=y
+    
     return meas_freqs[highest_index], meas_freqs[second_index]
+
+def find_most_similar(meas_freq):
+
+    dtmf_freqs=[697, 770, 852, 941, 1209, 1336, 1477]
+
+    error=10000
+    most_similar_index=-1
+    for x in range(len(dtmf_freqs)):
+        new_error=abs((dtmf_freqs[x]-meas_freq)/meas_freq)
+        if (new_error<error):
+            error, most_similar_index=new_error,x
+            
+    return dtmf_freqs[most_similar_index]
 
 def dtmf_to_digit(x,y):
     if x==697:
@@ -150,15 +126,45 @@ def dtmf_to_digit(x,y):
         else:
             return "#"
 
-def find_most_similar(meas_freq):
+if __name__ == '__main__':
 
-    dtmf_freqs=[697, 770, 852, 941, 1209, 1336, 1477]
+    if (len(sys.argv)>=1):
+        input_audio=sys.argv[1]
+    else :
+        print("Specify file path as command line arg")
 
-    error=10000
-    most_similar_index=-1
-    for x in range(len(dtmf_freqs)):
-        new_error=abs((dtmf_freqs[x]-meas_freq)/meas_freq)
-        if (new_error<error):
-            error, most_similar_index=new_error,x
-            
-    return dtmf_freqs[most_similar_index]
+    whole_file=pydub.AudioSegment.from_wav(input_audio)
+    duration=len(whole_file)
+    chunk_no=math.ceil(duration/.08)
+
+    outputstring=""
+    
+    for x in range (chunk_no):
+        
+        t1=x*.08
+        t2=t1+.08
+        if (t2>duration):t2=duration
+
+        chunk=pydub.AudioSegment.from_wav(input_audio)
+        chunk=chunk[t1:t2]
+        if len(chunk)==0:
+            break
+        else:
+            chunk.export('chunk.wav', format="wav")
+            fs, data = wavfile.read('chunk.wav')
+        
+            meas_freqs, result= goertzel(data)
+
+            meas_freq1, meas_freq2=extract_highest(meas_freqs, result)
+        
+            actual_freq1=find_most_similar(meas_freq1)
+            actual_freq2=find_most_similar(meas_freq2)
+
+            if actual_freq1>actual_freq2:
+                actual_freq1, actual_freq2= actual_freq2, actual_freq1
+
+            outputstring=outputstring+dtmf_to_digit(actual_freq1, actual_freq2)
+
+            os.remove('chunk.wav')
+
+    print(outputstring)
